@@ -46,6 +46,16 @@ async function run() {
     res.send(result);
   });
 
+
+  app.get("/car/:userId", async (req, res) => {
+    const { userId } = req.params;
+    const result = await carsCollection.find({ userId: userId }).toArray();
+    res.send(result);
+  });
+
+
+
+
   app.patch("/cars/:id", async (req, res) => {
     const id = req.params.id;
     const status = req.body;
