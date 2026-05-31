@@ -2,6 +2,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 require("dotenv").config();
 
 app.use(cors());
@@ -28,6 +29,43 @@ async function run() {
 
   const carsCollection = client.db("DriveFleet").collection("cars");
   const bookingCollection = client.db("DriveFleet").collection("booking");
+
+
+  const JWKS = createRemoteJWKSet(
+    new URL('http://localhost:3000/api/auth/jwks')
+  )
+  const verifyToken = async (req, res, next) => {
+    const headers = req.headers.authorization;
+    if (!headers) {
+      return res
+        .status(401)
+        .send({ error: true, message: "unauthorized access" });
+    }
+    const token = headers.split(" ")[1];
+    if (!token) {
+      return res
+        .status(401)
+        .send({ error: true, message: "unauthorized access" });
+    }
+
+    try {
+      const { payload } = await jwtVerify(token, JWKS);
+    if (!payload) {
+      return res
+        .status(401)
+        .send({ error: true, message: "unauthorized access" });
+      }
+      console.log(payload);
+      next();
+    } catch (error) {
+      return res
+        .status(401)
+        .send({ error: true, message: "unauthorized access" });
+    }
+   
+
+  };
+
   app.post("/cars", async (req, res) => {
     const car = req.body;
     const result = await carsCollection.insertOne(car);
@@ -38,23 +76,19 @@ async function run() {
     const result = await carsCollection.find().toArray();
     res.send(result);
   });
-
-  app.get("/cars/:userId", async (req, res) => {
+  // jhfsavge
+  app.get("/cars/:userId", verifyToken, async (req, res) => {
     const id = req.params.userId;
     const query = { _id: new ObjectId(id) };
     const result = await carsCollection.findOne(query);
     res.send(result);
   });
 
-
   app.get("/car/:userId", async (req, res) => {
     const { userId } = req.params;
     const result = await carsCollection.find({ userId: userId }).toArray();
     res.send(result);
   });
-
-
-
 
   app.patch("/cars/:id", async (req, res) => {
     const id = req.params.id;
